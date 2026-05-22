@@ -2,7 +2,11 @@ import fs from 'fs'
 import path from 'path'
 import type { ScriptMeta } from '@/lib/scripts'
 
-const KOUBO_DIR = path.join(process.cwd(), 'data/口播词')
+const KOUBO_DIR = process.env.KOUBO_RUNTIME_DIR
+  ? process.env.KOUBO_RUNTIME_DIR
+  : process.env.VERCEL
+    ? '/tmp/koubo'
+    : path.join(process.cwd(), 'data/口播词')
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-5.5'
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 const SCRIPT_MIN_SCORE = 8
@@ -414,7 +418,7 @@ function buildPrompt(count: number, today: string): string {
 async function callOpenRouter(count: number): Promise<GeneratedScript[]> {
   const apiKey = process.env.OPENROUTER_API_KEY
   if (!apiKey) {
-    throw new Error('缺少 OPENROUTER_API_KEY，请在项目根目录的 .env.local 中配置。')
+    throw new Error('缺少 OPENROUTER_API_KEY。\n本地开发：在项目根目录 .env.local 中配置。\n生产环境：在部署平台（Vercel 等）的 Environment Variables 中设置。')
   }
 
   const today = getTodayDir()
