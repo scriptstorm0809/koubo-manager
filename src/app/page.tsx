@@ -26,15 +26,32 @@ function saveStoredSet(key: string, set: Set<string>) {
 export default function Home() {
   const [scripts, setScripts] = useState<ScriptMeta[]>([])
   const [filter, setFilter] = useState<Filter>('all')
-  const [shotSet, setShotSet] = useState<Set<string>>(new Set())
-  const [deletedSet, setDeletedSet] = useState<Set<string>>(new Set())
+  const [shotSet, setShotSet] = useState<Set<string>>(() => getStoredSet(SHOT_KEY))
+  const [deletedSet, setDeletedSet] = useState<Set<string>>(() => getStoredSet(DELETE_KEY))
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [generateError, setGenerateError] = useState('')
+
+  const loadScripts = useCallback(async () => {
+    const response = await fetch('/api/scripts', { cache: 'no-store' })
+    const data = (await response.json()) as ScriptMeta[]
+    setScripts(data)
+  }, [])
 
   useEffect(() => {
-    setShotSet(getStoredSet(SHOT_KEY))
-    setDeletedSet(getStoredSet(DELETE_KEY))
-    fetch('/api/scripts')
-      .then((r) => r.json())
-      .then((data) => setScripts(data))
+    let cancelled = false
+
+    fetch('/api/scripts', { cache: 'no-store' })
+      .then((response) => response.json() as Promise<ScriptMeta[]>)
+      .then((data) => {
+        if (!cancelled) setScripts(data)
+      })
+      .catch(() => {
+        if (!cancelled) setGenerateError('口播词列表加载失败，请刷新页面重试')
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const toggleShot = useCallback((slug: string) => {
@@ -56,6 +73,33 @@ export default function Home() {
     })
   }, [])
 
+  const generateScripts = useCallback(async () => {
+    setIsGenerating(true)
+    setGenerateError('')
+
+    try {
+      const response = await fetch('/api/scripts/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ count: 3 }),
+      })
+      const data = (await response.json()) as { scripts?: ScriptMeta[]; error?: string }
+
+      if (!response.ok) {
+        throw new Error(data.error || '生成失败，请稍后重试')
+      }
+
+      await loadScripts()
+      setFilter('all')
+    } catch (error) {
+      setGenerateError(error instanceof Error ? error.message : '生成失败，请稍后重试')
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [loadScripts])
+
   const filtered = scripts.filter((s) => {
     if (deletedSet.has(s.slug)) return false
     if (filter === 'shot') return shotSet.has(s.slug)
@@ -71,9 +115,18 @@ export default function Home() {
         <div className="mx-auto max-w-2xl px-4 py-4">
           <div className="flex items-center justify-between">
             <h1 className="text-lg font-semibold text-white">口播词</h1>
-            <span className="text-sm text-[#737373]">
-              {shotCount}/{totalCount}
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={generateScripts}
+                disabled={isGenerating}
+                className="rounded-full border border-[#2a2a2a] bg-[#e5e5e5] px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-white disabled:cursor-not-allowed disabled:bg-[#2a2a2a] disabled:text-[#737373]"
+              >
+                {isGenerating ? '生成中，约 1 分钟' : 'AI 生成 3 篇'}
+              </button>
+              <span className="text-sm text-[#737373]">
+                {shotCount}/{totalCount}
+              </span>
+            </div>
           </div>
           <div className="mt-3 flex gap-1.5">
             {(['all', 'shot'] as Filter[]).map((f) => (
@@ -92,6 +145,11 @@ export default function Home() {
               </button>
             ))}
           </div>
+          {generateError && (
+            <p className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs leading-relaxed text-red-200">
+              {generateError}
+            </p>
+          )}
         </div>
       </header>
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 
 const STORAGE_KEY = 'koubo-font-size'
@@ -19,12 +19,11 @@ interface Props {
 }
 
 export default function ScriptPage({ script }: Props) {
-  const [fontSize, setFontSize] = useState(DEFAULT)
-
-  useEffect(() => {
+  const [fontSize, setFontSize] = useState(() => {
+    if (typeof window === 'undefined') return DEFAULT
     const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) setFontSize(Number(saved))
-  }, [])
+    return saved ? Number(saved) : DEFAULT
+  })
 
   const adjust = (delta: number) => {
     setFontSize((prev) => {

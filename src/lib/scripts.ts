@@ -20,16 +20,10 @@ export interface Script extends ScriptMeta {
   contentHtml: string
 }
 
-function padDate(n: number) {
-  return n.toString().padStart(2, '0')
-}
-
-function getTodayDir(): string {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = padDate(now.getMonth() + 1)
-  const day = padDate(now.getDate())
-  return `${year}-${month}-${day}`
+function normalizeDate(value: unknown, fallback: string): string {
+  if (value instanceof Date) return value.toISOString().slice(0, 10)
+  if (typeof value === 'string' && value.trim()) return value.slice(0, 10)
+  return fallback
 }
 
 export function getAllScriptDirs(): string[] {
@@ -59,7 +53,7 @@ export async function getAllScripts(): Promise<ScriptMeta[]> {
       scripts.push({
         slug,
         title: data.title || slug,
-        date: data.date || dir,
+        date: normalizeDate(data.date, dir),
         status: data.status || 'draft',
         wordCount: data.word_count || Math.round(content.replace(/\n/g, '').length),
         estimatedDuration: data.estimated_duration || '',
@@ -85,7 +79,7 @@ export async function getScript(slug: string): Promise<Script | null> {
       return {
         slug,
         title: data.title || slug,
-        date: data.date || dir,
+        date: normalizeDate(data.date, dir),
         status: data.status || 'draft',
         wordCount: data.word_count || Math.round(content.replace(/\n/g, '').length),
         estimatedDuration: data.estimated_duration || '',
